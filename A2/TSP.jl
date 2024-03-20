@@ -4,17 +4,17 @@ using StatsBase: sample
 using LinearAlgebra: norm
 using Plots
 
-export SymmetricProblemGenerator, VisualizeTour, VisualizeIntermediateSolution
+export RandomProblemGenerator, VisualizeTour, VisualizeIntermediateSolution
 
-#* name: SymmetricProblemGenerator
+#* name: RandomProblemGenerator
 # inputs:
 #   - sitesN: the number of sites
 #   - sqrL: the lenght of the one side of the squre where the sites are distributed
 # outputs:
 #   - sites: coordinates of the sites
 #   - C: {C_ij} is the length between the sites i and j
-function SymmetricProblemGenerator(sitesN::Int64, cu=1)
-    sites = cu * rand(sitesN, 2)
+function RandomProblemGenerator(sitesN::Int64)
+    sites = rand(sitesN, 2)
     return sites
 end
 
@@ -118,8 +118,6 @@ function GurobiSolverWithLazyConstraints(C)
     model = JuMP.Model(Gurobi.Optimizer)
     set_attribute(model, "OutputFlag", 0)
     
-    x_hist = []
-    
     @variable(model, x[1:1:sitesN, 1:1:sitesN], Bin)
 
     @constraints(model, begin
@@ -216,12 +214,29 @@ function GurobiSolverWithLazyConstraintsForGIF(C)
     end
 
     function call_back_function(cb_data)
-        x_val = (y->callback_value(cb_data, y)).(x)
-        subtour = find_subtour(x_val)
-        if length(subtour) < sitesN
-            con = @build_constraint(sum(x[i, j] for i in subtour, j in subtour) <= length(subtour)-1)
-            MOI.submit(model, MOI.LazyConstraint(cb_data), con)
+        status = callback_node_status(cb_data, model)
+        
+        if status != MOI.CALLBACK_NODE_STATUS_INTEGER
+            return
         end
+        
+        x_val = (y->callback_value(cb_data, y)).(x).data
+        
+        subtour = find_subtour(x_val)
+        S = length(subtour)
+        if S > sitesN-1
+            return
+        end
+        
+        ex = AffExpr()
+        for i in subtour, j in subtour
+            add_to_expression!(ex, 1, x[i, j])
+        end
+        
+        push!(x_hist, x_val)
+        
+        con = @build_constraint(ex <= S-1)
+        MOI.submit(model, MOI.LazyConstraint(cb_data), con)
         
         return
     end
