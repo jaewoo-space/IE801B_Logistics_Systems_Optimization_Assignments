@@ -106,7 +106,9 @@ function GurobiSolver(C)
     opt_tour = sortperm(t_opt).+1; pushfirst!(opt_tour, 1)
     opt_cost = objective_value(model)
 
-    return opt_tour, opt_cost
+    comp_time = solve_time(model)
+
+    return opt_tour, opt_cost, comp_time
 end
 
 function GurobiSolverWithLazyConstraints(C)
@@ -115,7 +117,9 @@ function GurobiSolverWithLazyConstraints(C)
     
     model = JuMP.Model(Gurobi.Optimizer)
     set_attribute(model, "OutputFlag", 0)
-
+    
+    x_hist = []
+    
     @variable(model, x[1:1:sitesN, 1:1:sitesN], Bin)
 
     @constraints(model, begin
@@ -127,33 +131,56 @@ function GurobiSolverWithLazyConstraints(C)
 
     @objective(model, Min, sum(C .* x))
 
-    opt_tour = []
-    opt_cost = 0.0
-    while true
-        optimize!(model)
-
-        x_val = value.(x).data
-
-        tour = [1]
+    function find_subtour(x_val, s=1)
+        subtour = [s]
         while true
-            _, next_site = findmax(x_val[tour[end], :])
-            if next_site == 1
+            _, next_site = findmax(x_val[subtour[end], :])
+            if next_site == s
                 break
             else
-                push!(tour, next_site)
+                push!(subtour, next_site)
             end
         end
-        tour_len = length(tour)
-        if tour_len < sitesN
-            @constraint(model, sum(x[tour, tour]) <= tour_len-1)
-        else
-            opt_tour = tour
-            opt_cost = objective_value(model)
-            break
-        end
+        return subtour
     end
 
-    return opt_tour, opt_cost
+    function call_back_function(cb_data)
+        status = callback_node_status(cb_data, model)
+        
+        if status != MOI.CALLBACK_NODE_STATUS_INTEGER
+            return
+        end
+        
+        x_val = (y->callback_value(cb_data, y)).(x).data
+        
+        subtour = find_subtour(x_val)
+        S = length(subtour)
+        if S > sitesN-1
+            return
+        end
+        
+        ex = AffExpr()
+        for i in subtour, j in subtour
+            add_to_expression!(ex, 1, x[i, j])
+        end
+
+        con = @build_constraint(ex <= S-1)
+        MOI.submit(model, MOI.LazyConstraint(cb_data), con)
+        
+        return
+    end
+
+    MOI.set(model, MOI.LazyConstraintCallback(), call_back_function)
+
+    optimize!(model)
+
+    x_opt = value.([x[i, j] for i in 1:1:sitesN, j in 1:1:sitesN])
+    opt_tour = find_subtour(x_opt)
+    opt_cost = objective_value(model)
+    
+    comp_time = solve_time(model)
+    
+    return opt_tour, opt_cost, comp_time
 end
 
 function GurobiSolverWithLazyConstraintsForGIF(C)
@@ -175,31 +202,33 @@ function GurobiSolverWithLazyConstraintsForGIF(C)
 
     @objective(model, Min, sum(C .* x))
 
-    opt_tour = []
-    opt_cost = 0.0
-    while true
-        optimize!(model)
-
-        x_val = value.(x).data
-
-        tour = [1]
+    function find_subtour(x_val, s=1)
+        subtour = [s]
         while true
-            _, next_site = findmax(x_val[tour[end], :])
-            if next_site == 1
+            _, next_site = findmax(x_val[subtour[end], :])
+            if next_site == s
                 break
             else
-                push!(tour, next_site)
+                push!(subtour, next_site)
             end
         end
-        tour_len = length(tour)
-        if tour_len < sitesN
-            @constraint(model, sum(x[tour, tour]) <= tour_len-1)
-        else
-            opt_tour = tour
-            opt_cost = objective_value(model)
-            break
-        end
+        return subtour
     end
+
+    function call_back_function(cb_data)
+        x_val = (y->callback_value(cb_data, y)).(x)
+        subtour = find_subtour(x_val)
+        if length(subtour) < sitesN
+            con = @build_constraint(sum(x[i, j] for i in subtour, j in subtour) <= length(subtour)-1)
+            MOI.submit(model, MOI.LazyConstraint(cb_data), con)
+        end
+        
+        return
+    end
+
+    MOI.set(model, MOI.LazyConstraintCallback(), call_back_function)
+
+    optimize!(model)
 
     return x_hist
 end
