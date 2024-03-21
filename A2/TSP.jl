@@ -38,24 +38,31 @@ function VisualizeTour(sites, tour, title = "")
     return fig
 end
 
-function VisualizeIntermediateSolution(sites, x_val, title = "")
+function VisualizeLazyConstraints(sites, x_hist, title = "")
     sitesN = size(sites)[1]
     
-    tour_plot = vcat(tour, tour[1])
+    fig_list = []
 
-    fig = plot(dpi=300)
-    for i in 1:1:sitesN
-        plot!([sites[tour_plot[i], 1], sites[tour_plot[i+1], 1]], [sites[tour_plot[i], 2], sites[tour_plot[i+1], 2]]; legend = false)
+    for hInd in eachindex(x_hist)
+        x_val = x_hist[hInd]
+        selected_edges = [(i, findmax(x_val[i, :])[2]) for i in 1:1:sitesN]
+        fig = plot(dpi=300, legend=false)
+        for edge in selected_edges
+            plot!([sites[edge[1], 1], sites[edge[2], 1]], [sites[edge[1], 2], sites[edge[2], 2]]; legend = false)
+        end
+        xaxis!([-0.15, 1.15])
+        xlabel!("X")
+        yaxis!([-0.15, 1.15])
+        xlabel!("Y")
+        xticks!([0.0, 0.5, 1.0])
+        yticks!([0.0, 0.5, 1.0])
+        scatter!(sites[:, 1], sites[:, 2], color=:black, markersize=3)
+        title!(title)
+
+        push!(fig_list, fig)
     end
-    xaxis!([0.0, 1.0])
-    xlabel!("X")
-    yaxis!([0.0, 1.0])
-    xlabel!("Y")
-    xticks!([0.0, 0.5, 1.0])
-    yticks!([0.5, 1.0])
-    scatter!(sites[:, 1], sites[:, 2])
-    title!(title)
-    return fig
+
+    return fig_list
 end
 
 end
@@ -75,6 +82,7 @@ export GurobiSolver, GurobiSolverWithLazyConstraints, GurobiSolverWithLazyConstr
 
 function GurobiSolver(C)
     sitesN = size(C)[1]
+    x_opt = Matrix{Bool}(undef, sitesN, sitesN)
     
     model = JuMP.Model(Gurobi.Optimizer)
     set_attribute(model, "OutputFlag", 0)
@@ -94,13 +102,9 @@ function GurobiSolver(C)
 
     @objective(model, Min, sum(C .* x))
 
-
     optimize!(model)
 
-    x_opt = Matrix{Bool}(undef, sitesN, sitesN)
-    
     x_opt = value.([x[i, j] for i in 1:1:sitesN, j in 1:1:sitesN])
-    
     t_opt = value.([t[i] for i in 2:1:sitesN])
     opt_tour = sortperm(t_opt).+1; pushfirst!(opt_tour, 1)
     opt_cost = objective_value(model)
@@ -111,7 +115,6 @@ function GurobiSolver(C)
 end
 
 function GurobiSolverWithLazyConstraints(C)
-
     sitesN = size(C)[1]
     
     model = JuMP.Model(Gurobi.Optimizer)
@@ -174,7 +177,6 @@ function GurobiSolverWithLazyConstraints(C)
     x_opt = value.([x[i, j] for i in 1:1:sitesN, j in 1:1:sitesN])
     opt_tour = find_subtour(x_opt)
     opt_cost = objective_value(model)
-    
     comp_time = solve_time(model)
     
     return opt_tour, opt_cost, comp_time
@@ -227,6 +229,7 @@ function GurobiSolverWithLazyConstraintsForGIF(C)
             return
         end
         
+        push!(x_hist, x_val)
         ex = AffExpr()
         for i in subtour, j in subtour
             add_to_expression!(ex, 1, x[i, j])
@@ -243,6 +246,8 @@ function GurobiSolverWithLazyConstraintsForGIF(C)
     MOI.set(model, MOI.LazyConstraintCallback(), call_back_function)
 
     optimize!(model)
+
+    push!(x_hist, value.([x[i, j] for i in 1:1:sitesN, j in 1:1:sitesN]))
 
     return x_hist
 end
