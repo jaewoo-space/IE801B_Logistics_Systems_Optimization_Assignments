@@ -94,9 +94,8 @@ function GurobiSolver(C)
 
     @objective(model, Min, sum(C .* x))
 
-    optimize!(model)
 
-    solution_summary(model, verbose=true)
+    optimize!(model)
 
     x_opt = Matrix{Bool}(undef, sitesN, sitesN)
     
