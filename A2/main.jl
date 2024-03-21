@@ -83,8 +83,6 @@ x_hist_gif = GurobiSolverWithLazyConstraintsForGIF(C_gif)
 fig_list = VisualizeLazyConstraints(sites_gif, x_hist_gif, "")
 [push!(fig_list, fig_list[end]) for i in 1:1:4]
 
-[savefig(fig_list[fInd], "for_gif$fInd") for fInd in eachindex(fig_list)]
-
 anim = @animate for fInd in eachindex(fig_list)
     plot(fig_list[fInd])
 end
