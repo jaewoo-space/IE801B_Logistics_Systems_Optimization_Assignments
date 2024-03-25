@@ -373,6 +373,47 @@ function Christofides(C)
     return opt_tour, opt_cost
 end
 
+function TwoOptSwapSlow(C, init_tour)
+    sitesN = size(C)[1]
+    opt_tour = copy(init_tour)
+    opt_cost = sum([C[opt_tour[sInd], opt_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[opt_tour[end], opt_tour[1]]
+    flag = false
+    while !flag
+        flag = true
+        for sInd in 1:1:(sitesN-1)
+            for ssInd in (sInd+1):1:sitesN
+                new_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:sInd], opt_tour[ssInd:end])
+                new_cost = sum([C[new_tour[sInd], new_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[new_tour[end], new_tour[1]]
+                if new_cost < opt_cost
+                    opt_tour = new_tour
+                    opt_cost = new_cost
+                    flag = false
+                    break
+                end
+            end
+        end
+    end
+
+    return opt_tour, opt_cost
+end
+
+function TwoOptSwap(C, init_tour, mod=1)
+    sitesN = size(C)[1]
+
+    opt_tour = copy(init_tour)
+    opt_cost = sum([C[opt_tour[sInd], opt_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[opt_tour[end], opt_tour[1]]
+    flag = false
+    if mod==1
+        while !flag
+        end
+    else
+        while !flag
+        end
+    end
+
+    return opt_tour, opt_cost
+end
+
 end
 
 module MetaHeuristics
