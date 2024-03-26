@@ -4,7 +4,7 @@ using StatsBase: sample
 using LinearAlgebra: norm
 using Plots
 
-export RandomProblemGenerator, VisualizeTour, VisualizeIntermediateSolution
+export RandomProblemGenerator, VisualizeTour, VisualizeTourHist, VisualizeIntermediateSolution
 
 #* name: RandomProblemGenerator
 # inputs:
@@ -43,6 +43,39 @@ function VisualizeTour(sites, tour, title = "")
     return fig
 end
 
+#* name: VisualizeTourHist
+# inputs:
+#   - sites: the coordinates of sites in 2D space
+#   - tour_hist: a sequence of tours
+#   - title: title of the visual
+# outputs:
+#   - fig_list: list of visual plots
+function VisualizeTourHist(sites, tour_hist, title = "", mode=1)
+    sitesN = size(sites)[1]
+    
+    fig_list = []
+
+    for hInd in eachindex(tour_hist)
+        tour_plot = vcat(tour_hist[hInd], tour_hist[hInd][1])
+        fig = plot(dpi=300)
+        for i in 1:1:sitesN
+            plot!([sites[tour_plot[i], 1], sites[tour_plot[i+1], 1]], [sites[tour_plot[i], 2], sites[tour_plot[i+1], 2]]; legend = false)
+        end
+        xaxis!([-0.15, 1.15])
+        xlabel!("X")
+        yaxis!([-0.15, 1.15])
+        ylabel!("Y")
+        xticks!([0.0, 0.5, 1.0])
+        yticks!([0.0, 0.5, 1.0])
+        scatter!(sites[:, 1], sites[:, 2], color=:black, markersize=3)
+        title!(title)
+
+        push!(fig_list, fig)
+    end
+
+    return fig_list
+end
+
 #* name: VisualizeLazyConstraints
 # inputs:
 #   - sites: the coordinates of sites in 2D space
@@ -50,7 +83,7 @@ end
 #   - title: title of the visual
 # outputs:
 #   - fig_list: list of visual plots
-function VisualizeLazyConstraints(sites, x_hist, title = "")
+function VisualizeLazyConstraints(sites, x_hist, title = "", mode=1)
     sitesN = size(sites)[1]
     
     fig_list = []
@@ -284,6 +317,7 @@ module Heuristics
 const eps = 1e-5
 
 using LinearAlgebra
+using StatsBase: sample
 
 export NearestNeighbor, Greedy, FarthestInsertion, Christofides, TwoOptSwapSlow, TwoOptSwap
 
@@ -470,11 +504,48 @@ function TwoOptSwapSlow(C, init_tour)
     return opt_tour, opt_cost
 end
 
+#* name: TwoOptSwapSlowForGIF
+# inputs:
+#   - C: {C_ij} is the length between the sites i and j
+#   - init_tour: the initial tour where the algorithm starts
+# outputs:
+#   - opt_tour_hist: optimal tours history
+#   - opt_cost_hist: optimal tour lengths history
+function TwoOptSwapSlowForGIF(C, init_tour)
+    sitesN = size(C)[1]
+    opt_tour = copy(init_tour)
+    opt_cost = sum([C[opt_tour[sInd], opt_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[opt_tour[end], opt_tour[1]]
+
+    opt_tour_hist = [opt_tour]
+    opt_cost_hist = [opt_cost]
+
+    flag = false
+    while !flag
+        flag = true
+        for sInd in 1:1:(sitesN-1)
+            for ssInd in (sInd+1):1:sitesN
+                new_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
+                new_cost = sum([C[new_tour[sInd], new_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[new_tour[end], new_tour[1]]
+                if new_cost < opt_cost_hist[end]
+                    opt_tour = new_tour
+                    opt_cost = new_cost
+                    push!(opt_tour_hist, opt_tour)
+                    push!(opt_cost_hist, opt_cost)
+                    flag = false
+                    break
+                end
+            end
+        end
+    end
+
+    return opt_tour_hist, opt_cost_hist
+end
+
 #* name: TwoOptSwap
 # inputs:
 #   - C: {C_ij} is the length between the sites i and j
 #   - init_tour: the initial tour where the algorithm starts
-#   - mode: 1 - update the solution whenever meet an improvement, otherwise - update the solution with the best swap
+#   - mode: 1 - update the solution whenever meet an improvement, 2 - update the solution with the best swap, otherwise - probabilistic method
 # outputs:
 #   - opt_tour: optimal tour
 #   - opt_cost: optimal tour length
@@ -488,32 +559,28 @@ function TwoOptSwap(C, init_tour, mode=1)
     if mode==1
         while !flag
             flag = true
-            for sInd in 1:1:(sitesN-1)
-                for ssInd in (sInd+1):1:sitesN
-                    dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
-                    if dl < -eps
-                        opt_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
-                        opt_cost += dl
-                        flag = false
-                        break
-                    end
+            for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
+                dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
+                if dl < -eps
+                    opt_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
+                    opt_cost += dl
+                    flag = false
+                    break
                 end
             end
         end
-    else
+    elseif mode==2
         while true
             flag = true
             dl_min = -eps
             candidates = Vector{Int}(undef, 2)
-            for sInd in 1:1:(sitesN-1)
-                for ssInd in (sInd+1):1:sitesN
-                    dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
-                    if dl < dl_min
-                        dl_min = dl
-                        candidates[1] = sInd
-                        candidates[2] = ssInd
-                        flag = false
-                    end
+            for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
+                dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
+                if dl < dl_min
+                    dl_min = dl
+                    candidates[1] = sInd
+                    candidates[2] = ssInd
+                    flag = false
                 end
             end
             if flag
@@ -522,13 +589,134 @@ function TwoOptSwap(C, init_tour, mode=1)
             opt_tour = vcat(opt_tour[1:candidates[1]], opt_tour[candidates[2]:-1:(candidates[1]+1)], opt_tour[(candidates[2]+1):end])
             opt_cost += dl_min
         end
+    else
+        T = 100.0
+        while T > 0.1
+            if rand() < T/200
+                sInd, ssInd = sort!(sample(1:1:sitesN, 2, replace=false))
+                opt_cost += (C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]])
+                opt_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
+            else
+                flag = true
+                dl_min = -eps
+                candidates = Vector{Int}(undef, 2)
+                for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
+                    dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
+                    if dl < dl_min
+                        dl_min = dl
+                        candidates[1] = sInd
+                        candidates[2] = ssInd
+                        flag = false
+                    end
+                end
+                if !flag
+                    opt_tour = vcat(opt_tour[1:candidates[1]], opt_tour[candidates[2]:-1:(candidates[1]+1)], opt_tour[(candidates[2]+1):end])
+                    opt_cost += dl_min    
+                end
+            end
+
+            T *= 0.99
+        end
     end
 
     return opt_tour, opt_cost
 end
 
+#* name: TwoOptSwapForGIF
+# inputs:
+#   - C: {C_ij} is the length between the sites i and j
+#   - init_tour: the initial tour where the algorithm starts
+#   - mode: 1 - update the solution whenever meet an improvement, 2 - update the solution with the best swap, otherwise - probabilistic method
+# outputs:
+#   - opt_tour_hist: optimal tours history
+#   - opt_cost_hist: optimal tour lengths history
+function TwoOptSwapForGIF(C, init_tour, mode=1)
+    global eps
+    sitesN = size(C)[1]
+    
+    opt_tour = copy(init_tour)
+    opt_cost = sum([C[opt_tour[sInd], opt_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[opt_tour[end], opt_tour[1]]
+
+    opt_tour_hist = [opt_tour]
+    opt_cost_hist = [opt_cost]
+
+    flag = false
+    if mode==1
+        while !flag
+            flag = true
+            for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
+                dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
+                if dl < -eps
+                    opt_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
+                    opt_cost += dl
+                    push!(opt_tour_hist, opt_tour)
+                    push!(opt_cost_hist, opt_cost)
+                    flag = false
+                    break
+                end
+            end
+        end
+    elseif mode==2
+        while true
+            flag = true
+            dl_min = -eps
+            candidates = Vector{Int}(undef, 2)
+            for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
+                dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
+                if dl < dl_min
+                    dl_min = dl
+                    candidates[1] = sInd
+                    candidates[2] = ssInd
+                    flag = false
+                end
+            end
+            if flag
+                break
+            end
+            opt_tour = vcat(opt_tour[1:candidates[1]], opt_tour[candidates[2]:-1:(candidates[1]+1)], opt_tour[(candidates[2]+1):end])
+            opt_cost += dl_min
+            push!(opt_tour_hist, opt_tour)
+            push!(opt_cost_hist, opt_cost)
+        end
+    else
+        T = 100.0
+        while T > 0.1
+            if rand() < T/200
+                sInd, ssInd = sort!(sample(1:1:sitesN, 2, replace=false))
+                opt_cost += (C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]])
+                opt_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
+                push!(opt_tour_hist, opt_tour)
+                push!(opt_cost_hist, opt_cost)
+            else
+                flag = true
+                dl_min = -eps
+                candidates = Vector{Int}(undef, 2)
+                for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
+                    dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
+                    if dl < dl_min
+                        dl_min = dl
+                        candidates[1] = sInd
+                        candidates[2] = ssInd
+                        flag = false
+                    end
+                end
+                if !flag
+                    opt_tour = vcat(opt_tour[1:candidates[1]], opt_tour[candidates[2]:-1:(candidates[1]+1)], opt_tour[(candidates[2]+1):end])
+                    opt_cost += dl_min
+                    push!(opt_tour_hist, opt_tour)
+                    push!(opt_cost_hist, opt_cost)
+                end
+            end
+
+            T *= 0.99
+        end
+    end
+
+    return opt_tour_hist, opt_cost_hist
 end
 
-module MetaHeuristics
+end
+
+module Metaheuristics
 
 end
