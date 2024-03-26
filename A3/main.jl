@@ -24,6 +24,7 @@ for nInd in eachindex(sitesN)
     println("---------- N = $(sitesN[nInd]) ----------")
     mkpath("./instances/N$(sitesN[nInd])")
     
+    # @threads for iInd in ProgressBar(1:1:instN)
     for iInd in ProgressBar(1:1:instN)
         sites = RandomProblemGenerator(sitesN[nInd])
         writedlm("./instances/N$(sitesN[nInd])/inst$iInd.csv", sites)
