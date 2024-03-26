@@ -9,15 +9,20 @@ export RandomProblemGenerator, VisualizeTour, VisualizeIntermediateSolution
 #* name: RandomProblemGenerator
 # inputs:
 #   - sitesN: the number of sites
-#   - sqrL: the lenght of the one side of the squre where the sites are distributed
 # outputs:
 #   - sites: coordinates of the sites
-#   - C: {C_ij} is the length between the sites i and j
 function RandomProblemGenerator(sitesN::Int64)
     sites = rand(sitesN, 2)
     return sites
 end
 
+#* name: VisualizeTour
+# inputs:
+#   - sites: the coordinates of sites in 2D space
+#   - tour: the tour the user want to visualize, a permutation of all the sites' indices
+#   - title: title of the visual
+# outputs:
+#   - fig: visual plot
 function VisualizeTour(sites, tour, title = "")
     sitesN = size(sites)[1]
     
@@ -38,6 +43,13 @@ function VisualizeTour(sites, tour, title = "")
     return fig
 end
 
+#* name: VisualizeLazyConstraints
+# inputs:
+#   - sites: the coordinates of sites in 2D space
+#   - x_hist: a sequence of IP solutions obtained over the lazy constraints solution procedures
+#   - title: title of the visual
+# outputs:
+#   - fig_list: list of visual plots
 function VisualizeLazyConstraints(sites, x_hist, title = "")
     sitesN = size(sites)[1]
     
@@ -77,10 +89,9 @@ export GurobiSolver, GurobiSolverWithLazyConstraints, GurobiSolverWithLazyConstr
 # inputs:
 #   - C: {C_ij} is the length between the sites i and j
 # outputs:
-#   - x_opt: optimal solution of the TSP formulated as IP
-#   - opt_tour: 
-#   - opt_cost: 
-#   - comp_time: 
+#   - opt_tour: optimal tour
+#   - opt_cost: optimal tour length
+#   - comp_time: solution time
 
 function GurobiSolver(C)
     sitesN = size(C)[1]
@@ -116,6 +127,13 @@ function GurobiSolver(C)
     return opt_tour, opt_cost, comp_time
 end
 
+#* name: GurobiSolverWithLazyConstraints
+# inputs:
+#   - C: {C_ij} is the length between the sites i and j
+# outputs:
+#   - opt_tour: optimal tour
+#   - opt_cost: optimal tour length
+#   - comp_time: solution time
 function GurobiSolverWithLazyConstraints(C)
     sitesN = size(C)[1]
     
@@ -184,6 +202,11 @@ function GurobiSolverWithLazyConstraints(C)
     return opt_tour, opt_cost, comp_time
 end
 
+#* name: GurobiSolverWithLazyConstraintsForGIF
+# inputs:
+#   - C: {C_ij} is the length between the sites i and j
+# outputs:
+#   - x_hist: sequence of IP solutions obtained over the solution procedures
 function GurobiSolverWithLazyConstraintsForGIF(C)
     sitesN = size(C)[1]
     
@@ -258,10 +281,18 @@ end
 
 module Heuristics
 
+const eps = 1e-5
+
 using LinearAlgebra
 
-export NearestNeighbor, Greedy, FarthestInsertion, Christofides
+export NearestNeighbor, Greedy, FarthestInsertion, Christofides, TwoOptSwapSlow, TwoOptSwap
 
+#* name: NearestNeighbor
+# inputs:
+#   - C: {C_ij} is the length between the sites i and j
+# outputs:
+#   - opt_tour: optimal tour
+#   - opt_cost: optimal tour length
 function NearestNeighbor(C)
     sitesN = size(C)[1]
     C_tpv = copy(C); C_tpv[diagind(C_tpv)] .= Inf
@@ -277,65 +308,99 @@ function NearestNeighbor(C)
     return opt_tour, opt_cost
 end
 
-# incomplete
+#* name: Greedy
+# inputs:
+#   - C: {C_ij} is the length between the sites i and j
+# outputs:
+#   - opt_tour: optimal tour
+#   - opt_cost: optimal tour length
 function Greedy(C)
+
+    function is_subtour(connected_sites, site_cnt, new_edge)
+        i = new_edge[1]
+        j = new_edge[2]
+        if (site_cnt[i] != 1) || (site_cnt[j] != 1)
+            return false
+        else
+            subtour = [i, connected_sites[i][1]]
+            while true
+                tpv1 = connected_sites[subtour[end]]
+                if tpv1[2] == 0
+                    break
+                else
+                    if tpv1[1] == subtour[end-1]
+                        push!(subtour, tpv1[2])
+                    else
+                        push!(subtour, tpv1[1])
+                    end
+                end
+            end
+
+            if subtour[end] == j
+                return true
+            else
+                return false
+            end
+        end
+    end
+
     sitesN = size(C)[1]
 
-    site_cnt = zeros(Int, sitesN)
-    edges = [(i, j) for i in 1:1:sitesN for j in 1:1:sitesN if i<j]
+    edges = Tuple{Int, Int}[(i, j) for i in 1:1:sitesN for j in 1:1:sitesN if i<j]
     edges_cost = [C[edge[1], edge[2]] for edge in edges]
-    selected_edges = []
-    for _ in 1:1:sitesN
+    sorted_arg = sortperm(edges_cost)
 
-        # TODO: subtour check part
+    connected_sites = [zeros(Int, 2) for sInd in 1:1:sitesN]
+    site_cnt = zeros(Int, sitesN)
+
+    opt_cost = 0.0
+    for _ in 1:1:(sitesN-1)
         while true
-            eInd = argmin(edges_cost)
-            break
-        end
-
-        push!(selected_edges, edges[eInd])
-        i, j = edges[eInd]
-
-        popat!(edges, eInd)
-        popat!(edges_cost, eInd)
-        if site_cnt[i] == 1
-            tpv1 = Set(findall(x->(x[1] == i) || (x[2] == i), edges))
-            tpv2 = collect(setdiff(Set(eachindex(edges)), tpv1))
-            edges = edges[tpv2]
-            edges_cost = edges_cost[tpv2]
-        end
-        if site_cnt[j] == 1
-            tpv1 = Set(findall(x->(x[1] == j) || (x[2] == j), edges))
-            tpv2 = collect(setdiff(Set(eachindex(edges)), tpv1))
-            edges = edges[tpv2]
-            edges_cost = edges_cost[tpv2]
-        end
-        
-        site_cnt[i] += 1; site_cnt[j] += 1
+            eInd = sorted_arg[1]
+            if (site_cnt[edges[eInd][1]] > 1) || (site_cnt[edges[eInd][2]] > 1) || is_subtour(connected_sites, site_cnt, edges[eInd])
+                popfirst!(sorted_arg)
+            else
+                opt_cost += edges_cost[sorted_arg[1]]
+                i = edges[eInd][1]; j = edges[eInd][2]
+                site_cnt[i] += 1; site_cnt[j] += 1
+                connected_sites[i][site_cnt[i]] = j; connected_sites[j][site_cnt[j]] = i
+                popfirst!(sorted_arg)
+                break
+            end
+        end                
     end
-    
-    opt_cost = sum([C[edge[1], edge[2]] for edge in selected_edges])
 
-    opt_tour = [selected_edges[1][1], selected_edges[1][2]]
-    popat!(selected_edges, 1)
-    for _ in 1:1:(sitesN-2)
-        tpv = findfirst(x->(x[1]==opt_tour[end]) || (x[2]==opt_tour[end]), selected_edges)
-        if selected_edges[tpv][1] == opt_tour[end]
-            push!(opt_tour, selected_edges[tpv][2])
-            popat!(selected_edges, tpv)
+    tpv = findall(x->x==1, site_cnt)
+    opt_cost += C[tpv[1], tpv[2]]
+
+    connected_sites[tpv[1]][2] = tpv[2]
+    connected_sites[tpv[2]][2] = tpv[1]
+    
+
+    opt_tour = [1, connected_sites[1][1]]
+    for sInd in 1:1:(sitesN-1)
+        prev_site = opt_tour[end-1]
+        curr_site = opt_tour[end]
+        if connected_sites[curr_site][1] == prev_site
+            push!(opt_tour, connected_sites[curr_site][2])
         else
-            push!(opt_tour, selected_edges[tpv][1])
-            popat!(selected_edges, tpv)
+            push!(opt_tour, connected_sites[curr_site][1])
         end
     end
-    
+
     return opt_tour, opt_cost
 end
 
+#* name: FarthestInsertion
+# inputs:
+#   - C: {C_ij} is the length between the sites i and j
+# outputs:
+#   - opt_tour: optimal tour
+#   - opt_cost: optimal tour length
 function FarthestInsertion(C)
     sitesN = size(C)[1]
     
-    opt_tour = [rand(1:1:sitesN)]
+    opt_tour = Int[rand(1:1:sitesN)]
     push!(opt_tour, argmax(C[opt_tour[end], :]))
     opt_cost = 2 * C[opt_tour[1], opt_tour[end]]
 
@@ -367,12 +432,20 @@ function FarthestInsertion(C)
     return opt_tour, opt_cost
 end
 
+# TODO
 function Christofides(C)
     opt_tour = 1
     opt_cost = 1
     return opt_tour, opt_cost
 end
 
+#* name: TwoOptSwapSlow
+# inputs:
+#   - C: {C_ij} is the length between the sites i and j
+#   - init_tour: the initial tour where the algorithm starts
+# outputs:
+#   - opt_tour: optimal tour
+#   - opt_cost: optimal tour length
 function TwoOptSwapSlow(C, init_tour)
     sitesN = size(C)[1]
     opt_tour = copy(init_tour)
@@ -382,7 +455,7 @@ function TwoOptSwapSlow(C, init_tour)
         flag = true
         for sInd in 1:1:(sitesN-1)
             for ssInd in (sInd+1):1:sitesN
-                new_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:sInd], opt_tour[ssInd:end])
+                new_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
                 new_cost = sum([C[new_tour[sInd], new_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[new_tour[end], new_tour[1]]
                 if new_cost < opt_cost
                     opt_tour = new_tour
@@ -397,17 +470,57 @@ function TwoOptSwapSlow(C, init_tour)
     return opt_tour, opt_cost
 end
 
-function TwoOptSwap(C, init_tour, mod=1)
+#* name: TwoOptSwap
+# inputs:
+#   - C: {C_ij} is the length between the sites i and j
+#   - init_tour: the initial tour where the algorithm starts
+#   - mode: 1 - update the solution whenever meet an improvement, otherwise - update the solution with the best swap
+# outputs:
+#   - opt_tour: optimal tour
+#   - opt_cost: optimal tour length
+function TwoOptSwap(C, init_tour, mode=1)
+    global eps
     sitesN = size(C)[1]
-
+    
     opt_tour = copy(init_tour)
     opt_cost = sum([C[opt_tour[sInd], opt_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[opt_tour[end], opt_tour[1]]
     flag = false
-    if mod==1
+    if mode==1
         while !flag
+            flag = true
+            for sInd in 1:1:(sitesN-1)
+                for ssInd in (sInd+1):1:sitesN
+                    dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
+                    if dl < -eps
+                        opt_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
+                        opt_cost += dl
+                        flag = false
+                        break
+                    end
+                end
+            end
         end
     else
-        while !flag
+        while true
+            flag = true
+            dl_min = -eps
+            candidates = Vector{Int}(undef, 2)
+            for sInd in 1:1:(sitesN-1)
+                for ssInd in (sInd+1):1:sitesN
+                    dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
+                    if dl < dl_min
+                        dl_min = dl
+                        candidates[1] = sInd
+                        candidates[2] = ssInd
+                        flag = false
+                    end
+                end
+            end
+            if flag
+                break
+            end
+            opt_tour = vcat(opt_tour[1:candidates[1]], opt_tour[candidates[2]:-1:(candidates[1]+1)], opt_tour[(candidates[2]+1):end])
+            opt_cost += dl_min
         end
     end
 
