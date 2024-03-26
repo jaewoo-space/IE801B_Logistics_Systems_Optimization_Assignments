@@ -8,69 +8,79 @@ using Concorde: solve_tsp
 using DelimitedFiles: writedlm, readdlm
 using Statistics: mean, std
 using ProgressBars
-using Base.Threads
+using Base.Threads: @threads
 
-seed!(31415)
+seed!(3141592)
 
-println("=========== Instances Generation ==========")
+# println("=========== Instances Generation ==========")
 
-sitesN =  [20, 50, 100, 1000, 10000]
-instN = 1000
+sitesN =  [20, 50, 100, 1000]
+instN = 100
 
-mkpath("./instances/optimal")
-opt_cost = zeros(instN, length(sitesN))
+# opt_cost = zeros(instN, length(sitesN))
 
-for nInd in eachindex(sitesN)
-    println("---------- N = $(sitesN[nInd]) ----------")
-    mkpath("./instances/N$(sitesN[nInd])")
+# for nInd in eachindex(sitesN)
+#     println("---------- N = $(sitesN[nInd]) ----------")
+#     mkpath("./instances/N$(sitesN[nInd])")
     
-    # @threads for iInd in ProgressBar(1:1:instN)
-    for iInd in ProgressBar(1:1:instN)
-        sites = RandomProblemGenerator(sitesN[nInd])
-        writedlm("./instances/N$(sitesN[nInd])/inst$iInd.csv", sites)
+#     @threads for iInd in ProgressBar(1:1:instN)
+#         sites = RandomProblemGenerator(sitesN[nInd])
+#         writedlm("./instances/N$(sitesN[nInd])/inst$iInd.csv", sites)
 
-        _, tpv = solve_tsp(sites[:, 1].*10000, sites[:, 2].*10000; dist="EUC_2D")
-        opt_cost[iInd, nInd] = tpv/10000
-    end
-end
-writedlm("./instances/opt_sol.csv", opt_cost)
-
-## optimal solution for each instance
-
-
-## Exp 1
-
-# for n in sitesN
-#     for iInd in 1:1:instN
-#         sites = readdlm("./instances/N$n/inst$Iind.csv")
-#         C = [norm(sites[i, :] .- sites[j, :]) for i in 1:1:n, j in 1:1:n]
-#         init_tour = collect(1:1:n)
-        
-#         ti = time()
-#         _, opt_cost = TwoOptSwapSlow(C, init_tour)
-#         te = time()
-
-
+#         _, tpv = solve_tsp(sites[:, 1].*10000, sites[:, 2].*10000; dist="EUC_2D")
+#         opt_cost[iInd, nInd] = tpv/10000
 #     end
 # end
+# writedlm("./instances/opt_sol.csv", opt_cost)
 
-# C = [norm(sites[i, :] .- sites[j, :]) for i in 1:1:sitesN, j in 1:1:sitesN]
+## Exp
 
-# opt_tour, opt_cost = Greedy(C)
+mkpath("./results")
+opt_costs = [zeros(instN, length(sitesN)) for _ in 1:4]
+comp_times = [zeros(instN, length(sitesN)) for _ in 1:4]
+for nInd in eachindex(sitesN)
+    println("---------- N = $(sitesN[nInd]) ----------")
+    for iInd in ProgressBar(1:1:instN)
+        sites = readdlm("./instances/N$(sitesN[nInd])/inst$iInd.csv")
+        C = [norm(sites[i, :] .- sites[j, :]) for i in 1:1:sitesN[nInd], j in 1:1:sitesN[nInd]]
+        init_tour = collect(1:1:sitesN[nInd])
 
-# fig = VisualizeTour(sites, opt_tour, "opt_cost=$(round(opt_cost, digits=2))")
+        ti = time()
+        _, opt_cost = TwoOptSwapSlow(C, init_tour)
+        te = time()
+        opt_costs[1][iInd, nInd] = round(opt_cost, digits=4)
+        comp_times[1][iInd, nInd] = te-ti
 
-# init_tour = opt_tour
+        ti = time()
+        _, opt_cost = TwoOptSwap(C, init_tour, 1)
+        te = time()
+        opt_costs[2][iInd, nInd] = round(opt_cost, digits=4)
+        comp_times[2][iInd, nInd] = te-ti
 
-# opt_tour, opt_cost = TwoOptSwap(C, init_tour, 1)
+        ti = time()
+        _, opt_cost = TwoOptSwap(C, init_tour, 2)
+        te = time()
+        opt_costs[3][iInd, nInd] = round(opt_cost, digits=4)
+        comp_times[3][iInd, nInd] = te-ti
 
-# fig = VisualizeTour(sites, opt_tour, "opt_cost=$(round(opt_cost, digits=2))")
+        ti = time()
+        _, opt_cost = TwoOptSwap(C, init_tour, 3)
+        te = time()
+        opt_costs[4][iInd, nInd] = round(opt_cost, digits=4)
+        comp_times[4][iInd, nInd] = te-ti
+    end
+    writedlm("./results/1a_cost.csv", opt_costs[1])
+    writedlm("./results/1a_time.csv", comp_times[1])
 
-# opt_tour, opt_cost = TwoOptSwap(C, init_tour, 2)
+    writedlm("./results/1b_cost.csv", opt_costs[2])
+    writedlm("./results/1b_time.csv", comp_times[2])
 
-# fig = VisualizeTour(sites, opt_tour, "opt_cost=$(round(opt_cost, digits=2))")
+    writedlm("./results/2b_cost.csv", opt_costs[3])
+    writedlm("./results/2b_time.csv", comp_times[3])
 
-# opt_tour, opt_cost = TwoOptSwap(C, init_tour, 3)
+    writedlm("./results/3_cost.csv", opt_costs[4])
+    writedlm("./results/3_time.csv", comp_times[4])
+end
 
-# fig = VisualizeTour(sites, opt_tour, "opt_cost=$(round(opt_cost, digits=2))")
+## Visualize
 

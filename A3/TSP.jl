@@ -314,7 +314,7 @@ end
 
 module Heuristics
 
-const eps = 1e-5
+const eps = 1e-10
 
 using LinearAlgebra
 using StatsBase: sample
@@ -481,22 +481,23 @@ end
 #   - opt_tour: optimal tour
 #   - opt_cost: optimal tour length
 function TwoOptSwapSlow(C, init_tour)
+    global eps
     sitesN = size(C)[1]
+    
     opt_tour = copy(init_tour)
-    opt_cost = sum([C[opt_tour[sInd], opt_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[opt_tour[end], opt_tour[1]]
+    opt_cost = sum([C[opt_tour[i], opt_tour[i+1]] for i in 1:1:(sitesN-1)]) + C[opt_tour[end], opt_tour[1]]
+    
     flag = false
     while !flag
         flag = true
-        for sInd in 1:1:(sitesN-1)
-            for ssInd in (sInd+1):1:sitesN
-                new_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
-                new_cost = sum([C[new_tour[sInd], new_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[new_tour[end], new_tour[1]]
-                if new_cost < opt_cost
-                    opt_tour = new_tour
-                    opt_cost = new_cost
-                    flag = false
-                    break
-                end
+        for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
+            new_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
+            new_cost = sum([C[new_tour[i], new_tour[i+1]] for i in 1:1:(sitesN-1)]) + C[new_tour[end], new_tour[1]]
+            if (new_cost - opt_cost) < -eps
+                opt_tour = new_tour
+                opt_cost = new_cost
+                flag = false
+                break
             end
         end
     end
@@ -512,7 +513,9 @@ end
 #   - opt_tour_hist: optimal tours history
 #   - opt_cost_hist: optimal tour lengths history
 function TwoOptSwapSlowForGIF(C, init_tour)
+    global eps
     sitesN = size(C)[1]
+    
     opt_tour = copy(init_tour)
     opt_cost = sum([C[opt_tour[sInd], opt_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[opt_tour[end], opt_tour[1]]
 
@@ -522,18 +525,16 @@ function TwoOptSwapSlowForGIF(C, init_tour)
     flag = false
     while !flag
         flag = true
-        for sInd in 1:1:(sitesN-1)
-            for ssInd in (sInd+1):1:sitesN
-                new_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
-                new_cost = sum([C[new_tour[sInd], new_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[new_tour[end], new_tour[1]]
-                if new_cost < opt_cost_hist[end]
-                    opt_tour = new_tour
-                    opt_cost = new_cost
-                    push!(opt_tour_hist, opt_tour)
-                    push!(opt_cost_hist, opt_cost)
-                    flag = false
-                    break
-                end
+        for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
+            new_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
+            new_cost = sum([C[new_tour[i], new_tour[i+1]] for i in 1:1:(sitesN-1)]) + C[new_tour[end], new_tour[1]]
+            if (new_cost - opt_cost) < -eps
+                opt_tour = new_tour
+                opt_cost = new_cost
+                push!(opt_tour_hist, opt_tour)
+                push!(opt_cost_hist, opt_cost)
+                flag = false
+                break
             end
         end
     end
@@ -555,6 +556,7 @@ function TwoOptSwap(C, init_tour, mode=1)
     
     opt_tour = copy(init_tour)
     opt_cost = sum([C[opt_tour[sInd], opt_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[opt_tour[end], opt_tour[1]]
+
     flag = false
     if mode==1
         while !flag
@@ -679,8 +681,8 @@ function TwoOptSwapForGIF(C, init_tour, mode=1)
             push!(opt_cost_hist, opt_cost)
         end
     else
-        T = 100.0
-        while T > 0.1
+        T = 1.0 * sitesN
+        while T > 1.0
             if rand() < T/200
                 sInd, ssInd = sort!(sample(1:1:sitesN, 2, replace=false))
                 opt_cost += (C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]])
@@ -708,7 +710,7 @@ function TwoOptSwapForGIF(C, init_tour, mode=1)
                 end
             end
 
-            T *= 0.99
+            T *= 0.98
         end
     end
 
