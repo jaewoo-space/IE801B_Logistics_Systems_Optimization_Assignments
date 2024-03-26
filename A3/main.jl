@@ -8,6 +8,7 @@ using Concorde: solve_tsp
 using DelimitedFiles: writedlm, readdlm
 using Statistics: mean, std
 using ProgressBars
+using Base.Threads
 
 seed!(31415)
 
@@ -16,12 +17,12 @@ println("=========== Instances Generation ==========")
 sitesN =  [20, 50, 100, 1000, 10000]
 instN = 1000
 
+mkpath("./instances/optimal")
 opt_cost = zeros(instN, length(sitesN))
 
 for nInd in eachindex(sitesN)
     println("---------- N = $(sitesN[nInd]) ----------")
     mkpath("./instances/N$(sitesN[nInd])")
-    mkpath("./instances/optimal")
     
     for iInd in ProgressBar(1:1:instN)
         sites = RandomProblemGenerator(sitesN[nInd])
