@@ -35,6 +35,7 @@ instN = 100
 
 ## Exp
 
+seed!(2718281)
 mkpath("./results")
 opt_costs = [zeros(instN, length(sitesN)) for _ in 1:4]
 comp_times = [zeros(instN, length(sitesN)) for _ in 1:4]

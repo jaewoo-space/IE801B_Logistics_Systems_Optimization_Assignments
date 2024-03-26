@@ -483,7 +483,7 @@ end
 function TwoOptSwapSlow(C, init_tour)
     global eps
     sitesN = size(C)[1]
-    
+
     opt_tour = copy(init_tour)
     opt_cost = sum([C[opt_tour[i], opt_tour[i+1]] for i in 1:1:(sitesN-1)]) + C[opt_tour[end], opt_tour[1]]
     
@@ -573,19 +573,17 @@ function TwoOptSwap(C, init_tour, mode=1)
         end
     elseif mode==2
         while true
-            flag = true
-            dl_min = -eps
+            dl_min = 0.0
             candidates = Vector{Int}(undef, 2)
             for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
                 dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
-                if dl < dl_min
+                if (dl - dl_min) < -eps
                     dl_min = dl
                     candidates[1] = sInd
                     candidates[2] = ssInd
-                    flag = false
                 end
             end
-            if flag
+            if dl_min > -eps
                 break
             end
             opt_tour = vcat(opt_tour[1:candidates[1]], opt_tour[candidates[2]:-1:(candidates[1]+1)], opt_tour[(candidates[2]+1):end])
@@ -599,19 +597,17 @@ function TwoOptSwap(C, init_tour, mode=1)
                 opt_cost += (C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]])
                 opt_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
             else
-                flag = true
-                dl_min = -eps
+                dl_min = 0.0
                 candidates = Vector{Int}(undef, 2)
                 for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
                     dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
-                    if dl < dl_min
+                    if (dl - dl_min) < -eps
                         dl_min = dl
                         candidates[1] = sInd
                         candidates[2] = ssInd
-                        flag = false
                     end
                 end
-                if !flag
+                if dl_min < -eps
                     opt_tour = vcat(opt_tour[1:candidates[1]], opt_tour[candidates[2]:-1:(candidates[1]+1)], opt_tour[(candidates[2]+1):end])
                     opt_cost += dl_min    
                 end
@@ -660,19 +656,17 @@ function TwoOptSwapForGIF(C, init_tour, mode=1)
         end
     elseif mode==2
         while true
-            flag = true
-            dl_min = -eps
+            dl_min = 0.0
             candidates = Vector{Int}(undef, 2)
             for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
                 dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
-                if dl < dl_min
+                if (dl - dl_min) < -eps
                     dl_min = dl
                     candidates[1] = sInd
                     candidates[2] = ssInd
-                    flag = false
                 end
             end
-            if flag
+            if dl_min > -eps
                 break
             end
             opt_tour = vcat(opt_tour[1:candidates[1]], opt_tour[candidates[2]:-1:(candidates[1]+1)], opt_tour[(candidates[2]+1):end])
@@ -681,36 +675,41 @@ function TwoOptSwapForGIF(C, init_tour, mode=1)
             push!(opt_cost_hist, opt_cost)
         end
     else
-        T = 1.0 * sitesN
+        T0 = 100.0
+        T = T0
         while T > 1.0
-            if rand() < T/200
+            if rand() < T/T0
                 sInd, ssInd = sort!(sample(1:1:sitesN, 2, replace=false))
-                opt_cost += (C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]])
+                dl = (C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]])
+                if dl > -eps
+                    T *= 0.95
+                end
+                opt_cost += dl
                 opt_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
                 push!(opt_tour_hist, opt_tour)
                 push!(opt_cost_hist, opt_cost)
+
             else
-                flag = true
-                dl_min = -eps
+                dl_min = 0.0
                 candidates = Vector{Int}(undef, 2)
                 for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
                     dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
-                    if dl < dl_min
+                    if (dl - dl_min) < -eps
                         dl_min = dl
                         candidates[1] = sInd
                         candidates[2] = ssInd
-                        flag = false
                     end
                 end
-                if !flag
+                if dl_min < -eps
                     opt_tour = vcat(opt_tour[1:candidates[1]], opt_tour[candidates[2]:-1:(candidates[1]+1)], opt_tour[(candidates[2]+1):end])
                     opt_cost += dl_min
                     push!(opt_tour_hist, opt_tour)
                     push!(opt_cost_hist, opt_cost)
+                else
+                    T *= 0.95
                 end
             end
 
-            T *= 0.98
         end
     end
 
