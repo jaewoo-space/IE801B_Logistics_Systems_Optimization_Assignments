@@ -1,4 +1,4 @@
-using JuMP, Gurobi, LinearAlgebra
+using JuMP, LinearAlgebra
 include("TSP.jl")
 using .Heuristics: TwoOptSwapSlow, TwoOptSwap, MyTwoOptSwap, TwoOptSwapForGIF, MyTwoOptSwapForGIF
 using .Tools: RandomProblemGenerator, VisualizeTourHist
@@ -10,7 +10,9 @@ using Statistics: mean, std
 using ProgressBars
 using Base.Threads: @threads
 
-seed!(3141592)
+
+## Instance generation
+# seed!(3141592)
 
 # println("=========== Instances Generation ==========")
 
@@ -33,12 +35,19 @@ instN = 100
 # end
 # writedlm("./instances/opt_sol.csv", opt_cost)
 
+#
+sites_test = readdlm("./instances/N20/inst20.csv");
+C_test = [norm(sites_test[i, :] .- sites_test[j, :]) for i in 1:1:20, j in 1:1:20];
+init_tour_test = collect(1:1:20);
+TwoOptSwapSlow(C_test, init_tour_test);
+TwoOptSwap(C_test, init_tour_test, 1);
+MyTwoOptSwap(C_test, init_tour_test);
 
 ## Experiments
-# for question 1a
 mkpath("./results")
-seed!(2718281)
 
+# for 1a
+seed!(2718281)
 opt_costs = zeros(instN, 3)
 comp_times = zeros(instN, 3)
 println("=========== Exp. for 1a ===========")
@@ -63,8 +72,7 @@ comp_times = [zeros(instN, length(sitesN)) for _ in 1:3]
 println("========== Exp. for other questions ==========")
 for nInd in eachindex(sitesN)
     println("---------- N = $(sitesN[nInd]) ----------")
-    # for iInd in ProgressBar(1:1:instN)
-    for iInd in ProgressBar(1:1:10)
+    for iInd in ProgressBar(1:1:instN)
         sites = readdlm("./instances/N$(sitesN[nInd])/inst$iInd.csv")
         C = [norm(sites[i, :] .- sites[j, :]) for i in 1:1:sitesN[nInd], j in 1:1:sitesN[nInd]]
         init_tour = collect(1:1:sitesN[nInd])
@@ -98,19 +106,31 @@ for nInd in eachindex(sitesN)
 end
 
 ## Visuals
-# sites = readdlm("./instances/N50/inst1.csv")
-# C = [norm(sites[i, :] .- sites[j, :]) for i in 1:1:50, j in 1:1:50]
-# init_tour = collect(1:1:50)
+sites_gif = readdlm("./instances/N20/inst20.csv")
+C_gif = [norm(sites_gif[i, :] .- sites_gif[j, :]) for i in 1:1:20, j in 1:1:20]
+init_tour_gif = collect(1:1:20)
 
-# opt_tour_hist = Vector{Vector{Vector{Int}}}(undef, 3)
-# opt_tour_hist[1], _ = TwoOptSwapForGIF(C, init_tour, 1)
-# opt_tour_hist[2], _ = TwoOptSwapForGIF(C, init_tour, 2)
-# opt_tour_hist[3], _ = MyTwoOptSwapForGIF(C, init_tour)
+opt_tour_hist_gif = Vector{Vector{Vector{Int}}}(undef, 3)
+opt_tour_hist_gif[1], _ = TwoOptSwapForGIF(C_gif, init_tour_gif, 1)
+opt_tour_hist_gif[2], _ = TwoOptSwapForGIF(C_gif, init_tour_gif, 2)
+opt_tour_hist_gif[3], _ = MyTwoOptSwapForGIF(C_gif, init_tour_gif)
 
-# for eInd in 1:1:3
-#     fig_list = VisualizeTourHist(sites, opt_tour_hist[eInd]); [push!(fig_list, fig_list[end]) for i in 1:1:10]
-#     anim = @animate for fig in fig_list
-#         plot(fig)
-#     end
-#     Plots.buildanimation(anim, "./results/animation$eInd.gif", fps=4)
-# end
+mkpath("./results/gif")
+for eInd in 1:1:3
+    if eInd == 3
+        fig_list = VisualizeTourHist(sites_gif, opt_tour_hist_gif[eInd]); [push!(fig_list, fig_list[end]) for i in 1:1:80]
+    else
+        fig_list = VisualizeTourHist(sites_gif, opt_tour_hist_gif[eInd]); [push!(fig_list, fig_list[end]) for i in 1:1:10]
+    end
+    for fInd in eachindex(fig_list)
+        savefig(fig_list[fInd], "./results/gif/fig$eInd-$fInd.png")
+    end
+    anim = @animate for fig in fig_list
+        plot(fig)
+    end
+    if eInd == 3
+        Plots.buildanimation(anim, "./results/animation$eInd.gif", fps=32)
+    else
+        Plots.buildanimation(anim, "./results/animation$eInd.gif", fps=4)
+    end
+end
