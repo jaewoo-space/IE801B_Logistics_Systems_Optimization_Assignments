@@ -606,23 +606,20 @@ function MyTwoOptSwap(C, init_tour)
     opt_tour = copy(init_tour)
     opt_cost = sum([C[opt_tour[sInd], opt_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[opt_tour[end], opt_tour[1]]
 
-    T = 100.0
-
-    while T > (1e-1/sitesN)
-        for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
-            dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
-            if dl < -eps
-                opt_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
-                opt_cost += dl
-            else
-                if rand() < T/200.0
-                    opt_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
-                    opt_cost += dl
-                end
-            end
+    T0 = 100.0
+    Tf = 1e-3
+    alpha = exp(-1/sitesN^2)
+    T = T0
+    while T > Tf
+        sInd, ssInd = sort!(sample(1:1:sitesN, 2, replace=false))
+        dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
+        if (dl < -eps) || (rand() < exp(-dl/T*sitesN))
+            opt_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
+            opt_cost += dl
+            # println("T = $T, dl = $(round(dl, digits=3)), prob = $(exp(-1/T*sitesN)), opt_cost = $(round(opt_cost, digits=3))")
         end
         
-        T *= 0.95
+        T *= alpha
     end
 
     return opt_tour, opt_cost

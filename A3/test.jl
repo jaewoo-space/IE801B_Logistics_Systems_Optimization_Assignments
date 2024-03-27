@@ -17,5 +17,6 @@ sites = readdlm("./instances/N$N/inst1.csv")
 C = [norm(sites[i, :] .- sites[j, :]) for i in 1:1:N, j in 1:1:N]
 init_tour = collect(1:1:N)
 
+
 @time MyTwoOptSwap(C, init_tour)
 @time TwoOptSwap(C, init_tour, 2)
