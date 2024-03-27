@@ -30,7 +30,7 @@ function VisualizeTour(sites, tour, title = "")
 
     fig = plot(dpi=300)
     for i in 1:1:sitesN
-        plot!([sites[tour_plot[i], 1], sites[tour_plot[i+1], 1]], [sites[tour_plot[i], 2], sites[tour_plot[i+1], 2]]; legend = false)
+        plot!([sites[tour_plot[i], 1], sites[tour_plot[i+1], 1]], [sites[tour_plot[i], 2], sites[tour_plot[i+1], 2]]; legend = false, color=:red)
     end
     xaxis!([-0.15, 1.15])
     xlabel!("X")
@@ -59,7 +59,7 @@ function VisualizeTourHist(sites, tour_hist, title = "", mode=1)
         tour_plot = vcat(tour_hist[hInd], tour_hist[hInd][1])
         fig = plot(dpi=300)
         for i in 1:1:sitesN
-            plot!([sites[tour_plot[i], 1], sites[tour_plot[i+1], 1]], [sites[tour_plot[i], 2], sites[tour_plot[i+1], 2]]; legend = false)
+            plot!([sites[tour_plot[i], 1], sites[tour_plot[i+1], 1]], [sites[tour_plot[i], 2], sites[tour_plot[i+1], 2]]; legend = false, color=:red)
         end
         xaxis!([-0.15, 1.15])
         xlabel!("X")
@@ -93,7 +93,7 @@ function VisualizeLazyConstraints(sites, x_hist, title = "", mode=1)
         selected_edges = [(i, findmax(x_val[i, :])[2]) for i in 1:1:sitesN]
         fig = plot(dpi=300, legend=false)
         for edge in selected_edges
-            plot!([sites[edge[1], 1], sites[edge[2], 1]], [sites[edge[1], 2], sites[edge[2], 2]]; legend = false)
+            plot!([sites[edge[1], 1], sites[edge[2], 1]], [sites[edge[1], 2], sites[edge[2], 2]]; legend = false, color=:red)
         end
         xaxis!([-0.15, 1.15])
         xlabel!("X")
