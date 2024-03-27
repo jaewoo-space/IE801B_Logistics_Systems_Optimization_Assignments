@@ -319,7 +319,7 @@ const eps = 1e-10
 using LinearAlgebra
 using StatsBase: sample
 
-export NearestNeighbor, Greedy, FarthestInsertion, Christofides, TwoOptSwapSlow, TwoOptSwap
+export NearestNeighbor, Greedy, FarthestInsertion, Christofides, TwoOptSwapSlow, TwoOptSwap, MyTwoOptSwap
 
 #* name: NearestNeighbor
 # inputs:
@@ -546,7 +546,7 @@ end
 # inputs:
 #   - C: {C_ij} is the length between the sites i and j
 #   - init_tour: the initial tour where the algorithm starts
-#   - mode: 1 - update the solution whenever meet an improvement, 2 - update the solution with the best swap, otherwise - probabilistic method
+#   - mode: 1 - update the solution whenever meet an improvement, 2 - update the solution with the best swap, otherwise - return nothing
 # outputs:
 #   - opt_tour: optimal tour
 #   - opt_cost: optimal tour length
@@ -556,68 +556,96 @@ function TwoOptSwap(C, init_tour, mode=1)
     
     opt_tour = copy(init_tour)
     opt_cost = sum([C[opt_tour[sInd], opt_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[opt_tour[end], opt_tour[1]]
-
-    flag = false
+    
+    flag = true
     if mode==1
-        while !flag
-            flag = true
+        while flag
+            flag = false
             for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
                 dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
                 if dl < -eps
                     opt_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
                     opt_cost += dl
-                    flag = false
-                    break
+                    flag = true
                 end
             end
         end
     elseif mode==2
-        while true
-            dl_min = 0.0
-            candidates = Vector{Int}(undef, 2)
-            for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
-                dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
-                if (dl - dl_min) < -eps
-                    dl_min = dl
-                    candidates[1] = sInd
-                    candidates[2] = ssInd
-                end
-            end
-            if dl_min > -eps
-                break
-            end
-            opt_tour = vcat(opt_tour[1:candidates[1]], opt_tour[candidates[2]:-1:(candidates[1]+1)], opt_tour[(candidates[2]+1):end])
-            opt_cost += dl_min
-        end
-    else
-        T = 100.0
-        while T > 0.1
-            if rand() < T/200
-                sInd, ssInd = sort!(sample(1:1:sitesN, 2, replace=false))
-                opt_cost += (C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]])
-                opt_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
-            else
+        while flag
+            flag = false
+            for sInd in 1:1:(sitesN-1)
                 dl_min = 0.0
-                candidates = Vector{Int}(undef, 2)
-                for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
+                site_imp = 0
+                for ssInd in (sInd+1):1:sitesN
                     dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
                     if (dl - dl_min) < -eps
                         dl_min = dl
-                        candidates[1] = sInd
-                        candidates[2] = ssInd
+                        site_imp = ssInd
                     end
                 end
-                if dl_min < -eps
-                    opt_tour = vcat(opt_tour[1:candidates[1]], opt_tour[candidates[2]:-1:(candidates[1]+1)], opt_tour[(candidates[2]+1):end])
-                    opt_cost += dl_min    
+                if site_imp > 0
+                    opt_tour = vcat(opt_tour[1:sInd], opt_tour[site_imp:-1:(sInd+1)], opt_tour[(site_imp+1):end])
+                    opt_cost += dl_min
+                    flag = true
                 end
             end
-
-            T *= 0.99
         end
+    else
+        println("provide a proper mode value")
+        return nothing
     end
 
     return opt_tour, opt_cost
+end
+
+#* name: MyTwoOptSwap
+# inputs:
+#   - C: {C_ij} is the length between the sites i and j
+#   - init_tour: the initial tour where the algorithm starts
+# outputs:
+#   - opt_tour: optimal tour
+#   - opt_cost: optimal tour length
+function MyTwoOptSwap(C, init_tour)
+    global eps
+    sitesN = size(C)[1]
+    
+    opt_tour = copy(init_tour)
+    opt_cost = sum([C[opt_tour[sInd], opt_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[opt_tour[end], opt_tour[1]]
+
+    T0 = 100.0
+    T = T0
+    while true
+        for sInd in 1:1:(sitesN-1)
+                if rand() < T/(100+T0)
+                site_imp = rand((sInd+1):1:sitesN)
+                dl = C[opt_tour[sInd], opt_tour[site_imp]] + C[opt_tour[sInd+1], opt_tour[site_imp+1 - (site_imp==sitesN)*sitesN]] - C[opt_tour[site_imp], opt_tour[site_imp+1 - (site_imp==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
+                opt_tour = vcat(opt_tour[1:sInd], opt_tour[site_imp:-1:(sInd+1)], opt_tour[(site_imp+1):end])
+                opt_cost += dl
+            else
+                dl_min = 0.0
+                site_imp = 0
+                for ssInd in (sInd+1):1:sitesN
+                    dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
+                    if (dl - dl_min) < -eps
+                        dl_min = dl
+                        site_imp = ssInd
+                    end
+                end
+                if site_imp > 0
+                    opt_tour = vcat(opt_tour[1:sInd], opt_tour[site_imp:-1:(sInd+1)], opt_tour[(site_imp+1):end])
+                    opt_cost += dl_min
+                # if no improvement
+                else
+                    T *= 0.99
+                end
+            end
+
+            # terminal condition
+            if T < 1/100/sitesN^2
+                return opt_tour, opt_cost
+            end
+        end
+    end
 end
 
 #* name: TwoOptSwapForGIF
@@ -634,14 +662,14 @@ function TwoOptSwapForGIF(C, init_tour, mode=1)
     
     opt_tour = copy(init_tour)
     opt_cost = sum([C[opt_tour[sInd], opt_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[opt_tour[end], opt_tour[1]]
-
+    
     opt_tour_hist = [opt_tour]
     opt_cost_hist = [opt_cost]
 
-    flag = false
+    flag = true
     if mode==1
-        while !flag
-            flag = true
+        while flag
+            flag = false
             for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
                 dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
                 if dl < -eps
@@ -649,71 +677,95 @@ function TwoOptSwapForGIF(C, init_tour, mode=1)
                     opt_cost += dl
                     push!(opt_tour_hist, opt_tour)
                     push!(opt_cost_hist, opt_cost)
-                    flag = false
-                    break
+                    flag = true
                 end
             end
         end
     elseif mode==2
-        while true
-            dl_min = 0.0
-            candidates = Vector{Int}(undef, 2)
-            for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
-                dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
-                if (dl - dl_min) < -eps
-                    dl_min = dl
-                    candidates[1] = sInd
-                    candidates[2] = ssInd
-                end
-            end
-            if dl_min > -eps
-                break
-            end
-            opt_tour = vcat(opt_tour[1:candidates[1]], opt_tour[candidates[2]:-1:(candidates[1]+1)], opt_tour[(candidates[2]+1):end])
-            opt_cost += dl_min
-            push!(opt_tour_hist, opt_tour)
-            push!(opt_cost_hist, opt_cost)
-        end
-    else
-        T0 = 100.0
-        T = T0
-        while T > 1.0
-            if rand() < T/T0
-                sInd, ssInd = sort!(sample(1:1:sitesN, 2, replace=false))
-                dl = (C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]])
-                if dl > -eps
-                    T *= 0.95
-                end
-                opt_cost += dl
-                opt_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
-                push!(opt_tour_hist, opt_tour)
-                push!(opt_cost_hist, opt_cost)
-
-            else
+        while flag
+            flag = false
+            for sInd in 1:1:(sitesN-1)
                 dl_min = 0.0
-                candidates = Vector{Int}(undef, 2)
-                for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
+                site_imp = 0
+                for ssInd in (sInd+1):1:sitesN
                     dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
                     if (dl - dl_min) < -eps
                         dl_min = dl
-                        candidates[1] = sInd
-                        candidates[2] = ssInd
+                        site_imp = ssInd
                     end
                 end
-                if dl_min < -eps
-                    opt_tour = vcat(opt_tour[1:candidates[1]], opt_tour[candidates[2]:-1:(candidates[1]+1)], opt_tour[(candidates[2]+1):end])
+                if site_imp > 0
+                    opt_tour = vcat(opt_tour[1:sInd], opt_tour[site_imp:-1:(sInd+1)], opt_tour[(site_imp+1):end])
                     opt_cost += dl_min
                     push!(opt_tour_hist, opt_tour)
                     push!(opt_cost_hist, opt_cost)
-                else
-                    T *= 0.95
+                    flag = true
                 end
             end
-
         end
+    else
+        println("provide a proper mode value")
+        return nothing
     end
 
     return opt_tour_hist, opt_cost_hist
+end
+
+#* name: MyTwoOptSwapForGIF
+# inputs:
+#   - C: {C_ij} is the length between the sites i and j
+#   - init_tour: the initial tour where the algorithm starts
+# outputs:
+#   - opt_tour: optimal tour
+#   - opt_cost: optimal tour length
+function MyTwoOptSwapForGIF(C, init_tour)
+    global eps
+    sitesN = size(C)[1]
+    
+    opt_tour = copy(init_tour)
+    opt_cost = sum([C[opt_tour[sInd], opt_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[opt_tour[end], opt_tour[1]]
+
+    opt_tour_hist = [opt_tour]
+    opt_cost_hist = [opt_cost]
+
+    T0 = 100.0
+    T = T0
+    while true
+        for sInd in 1:1:(sitesN-1)
+                if rand() < T/(100+T0)
+                site_imp = rand((sInd+1):1:sitesN)
+                dl = C[opt_tour[sInd], opt_tour[site_imp]] + C[opt_tour[sInd+1], opt_tour[site_imp+1 - (site_imp==sitesN)*sitesN]] - C[opt_tour[site_imp], opt_tour[site_imp+1 - (site_imp==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
+                opt_tour = vcat(opt_tour[1:sInd], opt_tour[site_imp:-1:(sInd+1)], opt_tour[(site_imp+1):end])
+                opt_cost += dl
+                push!(opt_tour_hist, opt_tour)
+                push!(opt_cost_hist, opt_cost)
+            else
+                dl_min = 0.0
+                site_imp = 0
+                for ssInd in (sInd+1):1:sitesN
+                    dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
+                    if (dl - dl_min) < -eps
+                        dl_min = dl
+                        site_imp = ssInd
+                    end
+                end
+                if site_imp > 0
+                    opt_tour = vcat(opt_tour[1:sInd], opt_tour[site_imp:-1:(sInd+1)], opt_tour[(site_imp+1):end])
+                    opt_cost += dl_min
+                    push!(opt_tour_hist, opt_tour)
+                    push!(opt_cost_hist, opt_cost)
+                # if no improvement
+                else
+                    T *= 0.99
+                end
+            end
+
+            # terminal condition
+            if T < 1/100/sitesN^2
+                return opt_tour_hist, opt_cost_hist
+            end
+        end
+    end
 end
 
 end
