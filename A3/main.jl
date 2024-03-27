@@ -1,7 +1,7 @@
 using JuMP, Gurobi, LinearAlgebra
 include("TSP.jl")
 using .Heuristics: TwoOptSwapSlow, TwoOptSwap, MyTwoOptSwap, TwoOptSwapForGIF, MyTwoOptSwapForGIF
-using .Tools: RandomProblemGenerator, VisualizeTour, VisualizeLazyConstraints
+using .Tools: RandomProblemGenerator, VisualizeTourHist
 using Plots
 using Random: seed!, shuffle
 using Concorde: solve_tsp
@@ -34,7 +34,8 @@ instN = 100
 # writedlm("./instances/opt_sol.csv", opt_cost)
 
 
-## for question 1a
+## Experiments
+# for question 1a
 mkpath("./results")
 seed!(2718281)
 
@@ -55,14 +56,15 @@ end
 writedlm("./results/1a_cost.csv", opt_costs)
 writedlm("./results/1a_time.csv", comp_times)
 
-## for other 
+# for the others
 seed!(2718281)
 opt_costs = [zeros(instN, length(sitesN)) for _ in 1:3]
 comp_times = [zeros(instN, length(sitesN)) for _ in 1:3]
 println("========== Exp. for other questions ==========")
 for nInd in eachindex(sitesN)
     println("---------- N = $(sitesN[nInd]) ----------")
-    for iInd in ProgressBar(1:1:instN)
+    # for iInd in ProgressBar(1:1:instN)
+    for iInd in ProgressBar(1:1:10)
         sites = readdlm("./instances/N$(sitesN[nInd])/inst$iInd.csv")
         C = [norm(sites[i, :] .- sites[j, :]) for i in 1:1:sitesN[nInd], j in 1:1:sitesN[nInd]]
         init_tour = collect(1:1:sitesN[nInd])
@@ -96,10 +98,19 @@ for nInd in eachindex(sitesN)
 end
 
 ## Visuals
-sites = readdlm("./instances/N50/inst1.csv")
-C = [norm(sites[i, :] .- sites[j, :]) for i in 1:1:sitesN[nInd], j in 1:1:sitesN[nInd]]
+# sites = readdlm("./instances/N50/inst1.csv")
+# C = [norm(sites[i, :] .- sites[j, :]) for i in 1:1:50, j in 1:1:50]
+# init_tour = collect(1:1:50)
 
-opt_tour_hist1, _ = TwoOptSwapForGIF(C, init_tour, 1)
-opt_tour_hist2, _ = TwoOptSwapForGIF(C, init_tour, 2)
-opt_tour_hist3, _ = MyTwoOptSwapForGIF(C, init_tour)
+# opt_tour_hist = Vector{Vector{Vector{Int}}}(undef, 3)
+# opt_tour_hist[1], _ = TwoOptSwapForGIF(C, init_tour, 1)
+# opt_tour_hist[2], _ = TwoOptSwapForGIF(C, init_tour, 2)
+# opt_tour_hist[3], _ = MyTwoOptSwapForGIF(C, init_tour)
 
+# for eInd in 1:1:3
+#     fig_list = VisualizeTourHist(sites, opt_tour_hist[eInd]); [push!(fig_list, fig_list[end]) for i in 1:1:10]
+#     anim = @animate for fig in fig_list
+#         plot(fig)
+#     end
+#     Plots.buildanimation(anim, "./results/animation$eInd.gif", fps=4)
+# end

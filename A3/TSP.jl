@@ -50,7 +50,7 @@ end
 #   - title: title of the visual
 # outputs:
 #   - fig_list: list of visual plots
-function VisualizeTourHist(sites, tour_hist, title = "", mode=1)
+function VisualizeTourHist(sites, tour_hist, title = "")
     sitesN = size(sites)[1]
     
     fig_list = []
@@ -574,17 +574,11 @@ function TwoOptSwap(C, init_tour, mode=1)
         while flag
             flag = false
             for sInd in 1:1:(sitesN-1)
-                dl_min = 0.0
-                site_imp = 0
-                for ssInd in (sInd+1):1:sitesN
-                    dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
-                    if (dl - dl_min) < -eps
-                        dl_min = dl
-                        site_imp = ssInd
-                    end
-                end
-                if site_imp > 0
-                    opt_tour = vcat(opt_tour[1:sInd], opt_tour[site_imp:-1:(sInd+1)], opt_tour[(site_imp+1):end])
+                dl_list = [C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]] for ssInd in (sInd+1):1:sitesN]
+                ssInd_imp = argmin(dl_list)
+                dl_min = dl_list[ssInd_imp]
+                if dl_min < -eps
+                    opt_tour = vcat(opt_tour[1:sInd], opt_tour[(ssInd_imp+sInd):-1:(sInd+1)], opt_tour[(ssInd_imp+sInd+1):end])
                     opt_cost += dl_min
                     flag = true
                 end
@@ -612,40 +606,26 @@ function MyTwoOptSwap(C, init_tour)
     opt_tour = copy(init_tour)
     opt_cost = sum([C[opt_tour[sInd], opt_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[opt_tour[end], opt_tour[1]]
 
-    T0 = 100.0
-    T = T0
-    while true
-        for sInd in 1:1:(sitesN-1)
-                if rand() < T/(100+T0)
-                site_imp = rand((sInd+1):1:sitesN)
-                dl = C[opt_tour[sInd], opt_tour[site_imp]] + C[opt_tour[sInd+1], opt_tour[site_imp+1 - (site_imp==sitesN)*sitesN]] - C[opt_tour[site_imp], opt_tour[site_imp+1 - (site_imp==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
-                opt_tour = vcat(opt_tour[1:sInd], opt_tour[site_imp:-1:(sInd+1)], opt_tour[(site_imp+1):end])
+    T = 100.0
+
+    while T > (1e-1/sitesN)
+        for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
+            dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
+            if dl < -eps
+                opt_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
                 opt_cost += dl
             else
-                dl_min = 0.0
-                site_imp = 0
-                for ssInd in (sInd+1):1:sitesN
-                    dl = C[opt_tour[sInd], opt_tour[ssInd]] + C[opt_tour[sInd+1], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[ssInd], opt_tour[ssInd+1 - (ssInd==sitesN)*sitesN]] - C[opt_tour[sInd], opt_tour[sInd+1]]
-                    if (dl - dl_min) < -eps
-                        dl_min = dl
-                        site_imp = ssInd
-                    end
+                if rand() < T/200.0
+                    opt_tour = vcat(opt_tour[1:sInd], opt_tour[ssInd:-1:(sInd+1)], opt_tour[(ssInd+1):end])
+                    opt_cost += dl
                 end
-                if site_imp > 0
-                    opt_tour = vcat(opt_tour[1:sInd], opt_tour[site_imp:-1:(sInd+1)], opt_tour[(site_imp+1):end])
-                    opt_cost += dl_min
-                # if no improvement
-                else
-                    T *= 0.99
-                end
-            end
-
-            # terminal condition
-            if T < 1/100/sitesN^2
-                return opt_tour, opt_cost
             end
         end
+        
+        T *= 0.95
     end
+
+    return opt_tour, opt_cost
 end
 
 #* name: TwoOptSwapForGIF
@@ -725,11 +705,15 @@ function MyTwoOptSwapForGIF(C, init_tour)
     opt_tour = copy(init_tour)
     opt_cost = sum([C[opt_tour[sInd], opt_tour[sInd+1]] for sInd in 1:1:(sitesN-1)]) + C[opt_tour[end], opt_tour[1]]
 
-    opt_tour_hist = [opt_tour]
-    opt_cost_hist = [opt_cost]
+    
 
     T0 = 100.0
     T = T0
+
+    opt_tour_hist = [opt_tour]
+    opt_cost_hist = [opt_cost]
+    T_hist = [T0]
+
     while true
         for sInd in 1:1:(sitesN-1)
                 if rand() < T/(100+T0)
@@ -739,6 +723,7 @@ function MyTwoOptSwapForGIF(C, init_tour)
                 opt_cost += dl
                 push!(opt_tour_hist, opt_tour)
                 push!(opt_cost_hist, opt_cost)
+                push!(T_hist)
             else
                 dl_min = 0.0
                 site_imp = 0
@@ -754,6 +739,7 @@ function MyTwoOptSwapForGIF(C, init_tour)
                     opt_cost += dl_min
                     push!(opt_tour_hist, opt_tour)
                     push!(opt_cost_hist, opt_cost)
+                    push!(T, T_hist)
                 # if no improvement
                 else
                     T *= 0.99
@@ -762,7 +748,7 @@ function MyTwoOptSwapForGIF(C, init_tour)
 
             # terminal condition
             if T < 1/100/sitesN^2
-                return opt_tour_hist, opt_cost_hist
+                return opt_tour_hist, opt_cost_hist, T_hist
             end
         end
     end
