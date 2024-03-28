@@ -3,39 +3,38 @@ include("TSP.jl")
 using .Heuristics: TwoOptSwapSlow, TwoOptSwap, MyTwoOptSwap, TwoOptSwapForGIF, MyTwoOptSwapForGIF
 using .Tools: RandomProblemGenerator, VisualizeTourHist
 using Plots
-using Random: seed!, shuffle
+using Random: seed!
 using Concorde: solve_tsp
 using DelimitedFiles: writedlm, readdlm
 using Statistics: mean, std
 using ProgressBars
 using Base.Threads: @threads
 
-
 ## Instance generation
-# seed!(3141592)
+seed!(3141592)
 
-# println("=========== Instances Generation ==========")
+println("=========== Instances Generation ==========")
 
 sitesN =  [20, 50, 100, 1000]
 instN = 100
 
-# opt_cost = zeros(instN, length(sitesN))
+opt_cost = zeros(instN, length(sitesN))
 
-# for nInd in eachindex(sitesN)
-#     println("---------- N = $(sitesN[nInd]) ----------")
-#     mkpath("./instances/N$(sitesN[nInd])")
+for nInd in eachindex(sitesN)
+    println("---------- N = $(sitesN[nInd]) ----------")
+    mkpath("./instances/N$(sitesN[nInd])")
     
-#     @threads for iInd in ProgressBar(1:1:instN)
-#         sites = RandomProblemGenerator(sitesN[nInd])
-#         writedlm("./instances/N$(sitesN[nInd])/inst$iInd.csv", sites)
+    @threads for iInd in ProgressBar(1:1:instN)
+        sites = RandomProblemGenerator(sitesN[nInd])
+        writedlm("./instances/N$(sitesN[nInd])/inst$iInd.csv", sites)
 
-#         _, tpv = solve_tsp(sites[:, 1].*10000, sites[:, 2].*10000; dist="EUC_2D")
-#         opt_cost[iInd, nInd] = tpv/10000
-#     end
-# end
-# writedlm("./instances/opt_sol.csv", opt_cost)
+        _, tpv = solve_tsp(sites[:, 1].*10000, sites[:, 2].*10000; dist="EUC_2D")
+        opt_cost[iInd, nInd] = tpv/10000
+    end
+end
+writedlm("./instances/opt_sol.csv", opt_cost)
 
-#
+
 sites_test = readdlm("./instances/N20/inst20.csv");
 C_test = [norm(sites_test[i, :] .- sites_test[j, :]) for i in 1:1:20, j in 1:1:20];
 init_tour_test = collect(1:1:20);
@@ -115,15 +114,11 @@ opt_tour_hist_gif[1], _ = TwoOptSwapForGIF(C_gif, init_tour_gif, 1)
 opt_tour_hist_gif[2], _ = TwoOptSwapForGIF(C_gif, init_tour_gif, 2)
 opt_tour_hist_gif[3], _ = MyTwoOptSwapForGIF(C_gif, init_tour_gif)
 
-mkpath("./results/gif")
 for eInd in 1:1:3
     if eInd == 3
         fig_list = VisualizeTourHist(sites_gif, opt_tour_hist_gif[eInd]); [push!(fig_list, fig_list[end]) for i in 1:1:80]
     else
         fig_list = VisualizeTourHist(sites_gif, opt_tour_hist_gif[eInd]); [push!(fig_list, fig_list[end]) for i in 1:1:10]
-    end
-    for fInd in eachindex(fig_list)
-        savefig(fig_list[fInd], "./results/gif/fig$eInd-$fInd.png")
     end
     anim = @animate for fig in fig_list
         plot(fig)
