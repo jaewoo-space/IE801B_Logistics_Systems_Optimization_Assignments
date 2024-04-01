@@ -314,7 +314,7 @@ end
 
 module Heuristics
 
-const eps = 1e-10
+const EPS = 1e-10
 
 using LinearAlgebra
 using StatsBase: sample
@@ -482,7 +482,7 @@ end
 #   - opt_cost: optimal tour length
 function TwoOptSwapSlow(C, init_tour)
 
-global eps
+global EPS
 sitesN = size(C)[1]
 
 opt_tour = copy(init_tour)
@@ -494,7 +494,7 @@ while !flag
     for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
         new_tour = Swap(opt_tour, sInd, ssInd)
         new_cost = CalculateCost(C, new_tour, sitesN)
-        if (new_cost - opt_cost) < -eps
+        if (new_cost - opt_cost) < -EPS
             opt_tour = new_tour
             opt_cost = new_cost
             flag = false
@@ -516,7 +516,7 @@ end
 #   - opt_cost: optimal tour length
 function TwoOptSwap(C, init_tour, mode=1)
 
-global eps
+global EPS
 sitesN = size(C)[1]
 
 opt_tour = copy(init_tour)
@@ -528,7 +528,7 @@ if mode==1
         flag = false
         for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
             dl = CalculateCostDiff(C, opt_tour, sitesN, sInd, ssInd)
-            if dl < -eps
+            if dl < -EPS
                 opt_tour = Swap(opt_tour, sInd, ssInd)
                 opt_cost += dl
                 flag = true
@@ -542,7 +542,7 @@ elseif mode==2
             dl_list = [CalculateCostDiff(C, opt_tour, sitesN, sInd, ssInd) for ssInd in (sInd+1):1:sitesN]
             ssInd_min = argmin(dl_list)
             dl_min = dl_list[ssInd_min]
-            if dl_min < -eps
+            if dl_min < -EPS
                 opt_tour = Swap(opt_tour, sInd, sInd+ssInd_min)
                 opt_cost += dl_min
                 flag = true
@@ -567,7 +567,7 @@ end
 #   - opt_cost: optimal tour length
 function MyTwoOptSwap(C, init_tour)
 
-global eps
+global EPS
 sitesN = size(C)[1]
 
 opt_tour = copy(init_tour)
@@ -580,7 +580,7 @@ T = T0
 while T > Tf
     sInd, ssInd = sort!(sample(1:1:sitesN, 2, replace=false))
     dl = CalculateCostDiff(C, opt_tour, sitesN, sInd, ssInd)
-    if (dl < -eps) || (rand() < exp(-dl/T*sitesN))
+    if (dl < -EPS) || (rand() < exp(-dl/T*sitesN))
         opt_tour = Swap(opt_tour, sInd, ssInd)
         opt_cost += dl
     end
@@ -602,7 +602,7 @@ end
 #   - opt_cost_hist: optimal tour lengths history
 function TwoOptSwapForGIF(C, init_tour, mode=1)
 
-global eps
+global EPS
 sitesN = size(C)[1]
 
 opt_tour = copy(init_tour)
@@ -617,7 +617,7 @@ if mode==1
         flag = false
         for sInd in 1:1:(sitesN-1), ssInd in (sInd+1):1:sitesN
             dl = CalculateCostDiff(C, opt_tour, sitesN, sInd, ssInd)
-            if dl < -eps
+            if dl < -EPS
                 opt_tour = Swap(opt_tour, sInd, ssInd)
                 opt_cost += dl
                 push!(opt_tour_hist, opt_tour)
@@ -633,7 +633,7 @@ elseif mode==2
             dl_list = [CalculateCostDiff(C, opt_tour, sitesN, sInd, ssInd) for ssInd in (sInd+1):1:sitesN]
             ssInd_min = argmin(dl_list)
             dl_min = dl_list[ssInd_min]
-            if dl_min < -eps
+            if dl_min < -EPS
                 opt_tour = Swap(opt_tour, sInd, sInd+ssInd_min)
                 opt_cost += dl_min
                 push!(opt_tour_hist, opt_tour)
@@ -660,7 +660,7 @@ end
 #   - opt_cost: optimal tour length
 function MyTwoOptSwapForGIF(C, init_tour)
 
-global eps
+global EPS
 sitesN = size(C)[1]
 
 opt_tour = copy(init_tour)
@@ -676,7 +676,7 @@ T = T0
 while T > Tf
     sInd, ssInd = sort!(sample(1:1:sitesN, 2, replace=false))
     dl = CalculateCostDiff(C, opt_tour, sitesN, sInd, ssInd)
-    if (dl < -eps) || (rand() < exp(-dl/T*sitesN))
+    if (dl < -EPS) || (rand() < exp(-dl/T*sitesN))
         opt_tour = Swap(opt_tour, sInd, ssInd)
         opt_cost += dl
         push!(opt_tour_hist, opt_tour)

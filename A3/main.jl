@@ -18,7 +18,7 @@ println("=========== Instances Generation ==========")
 sitesN =  [20, 50, 100, 1000]
 instN = 100
 
-opt_cost = zeros(instN, length(sitesN))
+opt_cost_inst = zeros(instN, length(sitesN))
 
 for nInd in eachindex(sitesN)
     println("---------- N = $(sitesN[nInd]) ----------")
@@ -29,10 +29,10 @@ for nInd in eachindex(sitesN)
         writedlm("./instances/N$(sitesN[nInd])/inst$iInd.csv", sites)
 
         _, tpv = solve_tsp(sites[:, 1].*10000, sites[:, 2].*10000; dist="EUC_2D")
-        opt_cost[iInd, nInd] = tpv/10000
+        opt_cost_inst[iInd, nInd] = tpv/10000
     end
 end
-writedlm("./instances/opt_sol.csv", opt_cost)
+writedlm("./instances/opt_sol.csv", opt_cost_inst)
 
 
 sites_test = readdlm("./instances/N20/inst20.csv");
