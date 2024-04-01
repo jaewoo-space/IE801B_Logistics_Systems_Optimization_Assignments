@@ -482,7 +482,7 @@ end
 #   - opt_cost: optimal tour length
 function TwoOptSwapSlow(C, init_tour)
 
-global eps
+# global eps
 sitesN = size(C)[1]
 
 opt_tour = copy(init_tour)
@@ -516,7 +516,7 @@ end
 #   - opt_cost: optimal tour length
 function TwoOptSwap(C, init_tour, mode=1)
 
-global eps
+# global eps
 sitesN = size(C)[1]
 
 opt_tour = copy(init_tour)
@@ -567,7 +567,7 @@ end
 #   - opt_cost: optimal tour length
 function MyTwoOptSwap(C, init_tour)
 
-global eps
+# global eps
 sitesN = size(C)[1]
 
 opt_tour = copy(init_tour)
@@ -602,7 +602,7 @@ end
 #   - opt_cost_hist: optimal tour lengths history
 function TwoOptSwapForGIF(C, init_tour, mode=1)
 
-global eps
+# global eps
 sitesN = size(C)[1]
 
 opt_tour = copy(init_tour)
@@ -660,7 +660,7 @@ end
 #   - opt_cost: optimal tour length
 function MyTwoOptSwapForGIF(C, init_tour)
 
-global eps
+# global eps
 sitesN = size(C)[1]
 
 opt_tour = copy(init_tour)
