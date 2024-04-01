@@ -5,6 +5,8 @@ using .Solver: IPSolver, solve_rmp_and_pricing_problems, cal_cost_time
 using JLD
 using Graphs, SimpleWeightedGraphs
 
+const EPS = 1e-10
+
 prob = load("prob1.jld")["prob"]
 
 const data = prob.data
@@ -38,6 +40,17 @@ push!(times, time)
 push!(paths, path_arcs)
 
 path_ind, costs, times, paths, λ_val, obj_val = solve_rmp_and_pricing_problems(path_ind, costs, times, paths, data, Tmax, start_node, end_node, arc_cost, arc_time, origin, destination, n_nodes, n_arcs)
+
+if sum(λ_val .> 1-EPS) == 1     # if λ is integer
+    1
+else    # if λ is fractional
+    x_val = zeros(Float64, n_arcs)
+    for pInd in eachindex(paths), aInd in paths[pInd]
+        x_val[aInd] += λ_val[pInd]
+    end
+
+end
+
 
 # TODO
 # if λ is fractional, branch
