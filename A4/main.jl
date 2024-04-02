@@ -28,9 +28,9 @@ opt_cost_ip2, opt_path_ip2 = IPSolver(data2, Tmax2, origin2, destination2)
 ## display the solution
 println("==================== Results Summary ====================")
 println("---------- Problem 1 ----------")
-println("link/node-based formulation: selected arcs - $opt_path_ip1, opt_cost - $opt_cost_ip1")
-println("column generation: selected arcs - $(opt_sol_cg1[5]), opt_cost - $(opt_sol_cg1[4])")
+println("link/node-based formulation: selected arcs - $([Int.(data1[i, 1:2]) for i in collect(opt_path_ip1)]), opt_cost - $opt_cost_ip1")
+println("column generation: selected arcs - $([Int.(data1[i, 1:2]) for i in collect(opt_sol_cg1[5])]), opt_cost - $(opt_sol_cg1[4])")
 
 println("---------- Problem 2 ----------")
-println("link/node-based formulation: selected arcs - $opt_path_ip2, opt_cost - $opt_cost_ip2")
-println("column generation: selected arcs - $(opt_sol_cg2[5]), opt_cost - $(opt_sol_cg2[4])")
+println("link/node-based formulation: selected arcs - $([Int.(data2[i, 1:2]) for i in collect(opt_path_ip2)]), opt_cost - $opt_cost_ip2")
+println("column generation: selected arcs - $([Int.(data2[i, 1:2]) for i in collect(opt_sol_cg2[5])]), opt_cost - $(opt_sol_cg2[4])")
