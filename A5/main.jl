@@ -1,3 +1,5 @@
+include("ESPPRC.jl")
+using .Solvers: Feillet
 using CVRPLIB, DelimitedFiles
 
 cvrp1, _, _ = readCVRPLIB("P-n16-k8")
@@ -10,7 +12,6 @@ cvrp3, _, _ = readCVRPLIB("B-n64-k9")
 dual3 = readdlm("./data/dual_var_B-n64-k9.csv")
 
 
-dual = dual1
 capacity = cvrp1.capacity
 weights = cvrp1.weights
 demand = cvrp1.demand
