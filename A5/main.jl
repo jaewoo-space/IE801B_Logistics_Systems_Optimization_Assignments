@@ -2,25 +2,16 @@ include("ESPPRC.jl")
 using .Solvers: Feillet
 using CVRPLIB, DelimitedFiles
 
-cvrp1, _, _ = readCVRPLIB("P-n16-k8")
-dual1 = readdlm("./data/dual_var_P-n16-k8.csv")
+prob_name_list = ["P-n16-k8", "A-n32-k5", "B-n64-k9"]
+pInd = 1
 
-cvrp2, _, _ = readCVRPLIB("A-n32-k5")
-dual2 = readdlm("./data/dual_var_A-n32-k5.csv")
+cvrp, _, _ = readCVRPLIB(prob_name_list[pInd])
+dual = readdlm("./data/dual_var_"*prob_name_list[pInd]*".csv")
 
-cvrp3, _, _ = readCVRPLIB("B-n64-k9")
-dual3 = readdlm("./data/dual_var_B-n64-k9.csv")
+capacity = cvrp.capacity
+weights = cvrp.weights
+demand = cvrp.demand
+depot = cvrp.depot
+customers = cvrp.customers
 
-
-capacity = cvrp1.capacity
-weights = cvrp1.weights
-demand = cvrp1.demand
-depot = cvrp1.depot
-customers = cvrp1.customers
-
-nodes = vcat(depot, customers)
-N = length(nodes)
-weights
-demand
-customers
-label = zeros(Float64, length(nodes), 2 + 1 + N)
+Feillet(capacity, demand, depot, customers, weights .- dual[1:(end-1)])
